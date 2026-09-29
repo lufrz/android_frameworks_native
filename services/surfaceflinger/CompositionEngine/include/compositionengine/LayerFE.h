@@ -143,6 +143,13 @@ public:
         int32_t sequence = -1;
     };
 
+    // Keep this shared base-class layout identical in all consumers.
+    struct Dither {
+        bool checked = false;
+        bool enabled = false;
+    };
+    Dither mDither;
+
     // Describes the states of the release fence. Checking the states allows checks
     // to ensure that set_value() is not called on the same promise multiple times,
     // and can indicate if the promise has been fulfilled.

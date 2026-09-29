@@ -1583,6 +1583,13 @@ std::vector<LayerFE::LayerSettings> Output::generateClientCompositionRequests(
 
         const Region clip(viewportRegion.intersect(layerState.visibleRegion));
         ALOGV("Layer: %s", layerFE.getDebugName());
+#ifdef MTK_IN_DISPLAY_FINGERPRINT
+        if (!layerFE.mDither.checked) {
+            const std::string layerName = layerFE.getDebugName();
+            layerFE.mDither.enabled = layerName.find(DITHER_LAYER_NAME) != std::string::npos;
+            layerFE.mDither.checked = true;
+        }
+#endif
         if (clip.isEmpty()) {
             ALOGV("  Skipping for empty clip");
             firstLayer = false;

@@ -40,7 +40,8 @@ inline bool equalIgnoringSource(const renderengine::LayerSettings& lhs,
             lhs.backgroundBlurScale == rhs.backgroundBlurScale &&
             lhs.stretchEffect == rhs.stretchEffect &&
             lhs.edgeExtensionEffect == rhs.edgeExtensionEffect &&
-            lhs.whitePointNits == rhs.whitePointNits && lhs.blurRegions == rhs.blurRegions;
+            lhs.whitePointNits == rhs.whitePointNits && lhs.blurRegions == rhs.blurRegions &&
+            lhs.enableDither == rhs.enableDither;
 }
 
 inline bool equalIgnoringBuffer(const renderengine::Buffer& lhs, const renderengine::Buffer& rhs) {

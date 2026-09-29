@@ -183,6 +183,10 @@ struct LayerSettings {
 
     std::shared_ptr<gui::DisplayLuts> luts;
 
+    // MediaTek optical UDFPS dim layer. Keep the layout identical for all consumers,
+    // including those built without MTK_IN_DISPLAY_FINGERPRINT.
+    bool enableDither = false;
+
     std::shared_ptr<IPCServerResourceCache> renderResourceCache;
     std::shared_ptr<RenderCommandBuffer> renderCommandBuffer;
 
@@ -239,7 +243,8 @@ static inline bool operator==(const LayerSettings& lhs, const LayerSettings& rhs
             lhs.blurRegionTransform == rhs.blurRegionTransform &&
             lhs.stretchEffect == rhs.stretchEffect &&
             lhs.edgeExtensionEffect == rhs.edgeExtensionEffect &&
-            lhs.whitePointNits == rhs.whitePointNits && lhs.luts == rhs.luts;
+            lhs.whitePointNits == rhs.whitePointNits && lhs.luts == rhs.luts &&
+            lhs.enableDither == rhs.enableDither;
 }
 
 static inline void PrintTo(const Buffer& settings, ::std::ostream* os,
@@ -369,6 +374,7 @@ static inline void PrintTo(const LayerSettings& settings, ::std::ostream* os,
     PrintMatrix(settings.colorTransform, os);
     *os << newline << ".disableBlending = " << settings.disableBlending;
     *os << newline << ".skipContentDraw = " << settings.skipContentDraw;
+    *os << newline << ".enableDither = " << settings.enableDither;
     if (settings.shadow != ShadowSettings()) {
         *os << newline << ".shadow = ";
         PrintTo(settings.shadow, os, currentIndent + 1);
