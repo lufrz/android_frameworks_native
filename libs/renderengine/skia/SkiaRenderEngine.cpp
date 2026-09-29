@@ -357,6 +357,9 @@ SkiaRenderEngine::SkiaRenderEngine(Threaded threaded, PixelFormat pixelFormat,
     }
 
     mCapture = std::make_unique<SkiaCapture>();
+#ifdef MTK_IN_DISPLAY_FINGERPRINT
+    mSkiaDitherEffect = std::make_unique<SkiaDitherEffect>();
+#endif
 }
 
 SkiaRenderEngine::~SkiaRenderEngine() { }
@@ -1027,6 +1030,18 @@ void SkiaRenderEngine::drawLayersInternal(
     if (kPrintLayerSettings) {
         logSettings(display);
     }
+#ifdef MTK_IN_DISPLAY_FINGERPRINT
+    float ditherAlpha = 1.0f;
+    int ditherDimLayerCount = 0;
+    if (mSkiaDitherEffect && mSkiaDitherEffect->isInitOK()) {
+        for (const auto& layer : layers) {
+            if (layer.enableDither && !layer.skipContentDraw && layer.alpha > 0.f) {
+                ++ditherDimLayerCount;
+                ditherAlpha *= 1.f - static_cast<float>(layer.alpha);
+            }
+        }
+    }
+#endif
     for (const auto& layer : layers) {
         SFTRACE_FORMAT("DrawLayer: %s", layer.name.c_str());
 
@@ -1388,6 +1403,41 @@ void SkiaRenderEngine::drawLayersInternal(
                 ? ColorSpaceOptions::USE_HLG_OOTF
                 : ColorSpaceOptions::None;
 
+#ifdef MTK_IN_DISPLAY_FINGERPRINT
+        if (layer.enableDither && ditherDimLayerCount > 0 && layer.alpha > 0.f) {
+            --ditherDimLayerCount;
+            if (isProtected() || ditherDimLayerCount > 0) {
+                // Protected input is dimmed per layer below; otherwise dim the composed
+                // background once, when the last HBM dim layer is reached.
+                continue;
+            }
+            auto image = activeSurface->makeImageSnapshot();
+            SkMatrix inverseCanvas;
+            if (image && canvas->getTotalMatrix().invert(&inverseCanvas)) {
+                auto shader = mSkiaDitherEffect->createDitherShader(
+                        image->makeShader(SkSamplingOptions(), inverseCanvas), ditherAlpha);
+                if (shader) {
+                    SkPaint dimPaint;
+                    dimPaint.setShader(std::move(shader));
+                    dimPaint.setBlendMode(SkBlendMode::kSrc);
+                    if (!roundRectClip.isEmpty()) {
+                        canvas->clipRRect(roundRectClip, enableAntiAlias);
+                    }
+                    if (!bounds.isRect()) {
+                        dimPaint.setAntiAlias(true);
+                        canvas->drawRRect(bounds, dimPaint);
+                    } else {
+                        canvas->drawRect(bounds.rect(), dimPaint);
+                    }
+                    skgpu::ganesh::Flush(activeSurface);
+                    continue;
+                }
+            }
+            // Keep ordinary dim-layer composition if the snapshot/shader cannot be created.
+            ALOGE("Failed to create MediaTek UDFPS dither shader");
+        }
+#endif
+
         SkPaint paint;
         if (layer.source.buffer.buffer) {
             SFTRACE_NAME("DrawImage");
@@ -1541,6 +1591,16 @@ void SkiaRenderEngine::drawLayersInternal(
                                                   .agtm = agtm,
                                                   .colorSpaceOptions = colorSpaceOptions}));
         }
+
+#ifdef MTK_IN_DISPLAY_FINGERPRINT
+        if (isProtected() && ditherDimLayerCount > 0 && !layer.enableDither) {
+            // Preserve the Android color/HDR pipeline before applying the MTK dimming effect.
+            auto shader = mSkiaDitherEffect->createDitherShader(paint.refShader(), ditherAlpha);
+            if (shader) {
+                paint.setShader(std::move(shader));
+            }
+        }
+#endif
 
         if (layer.disableBlending) {
             paint.setBlendMode(SkBlendMode::kSrc);
